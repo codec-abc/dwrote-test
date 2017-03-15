@@ -1,4 +1,5 @@
 extern crate dwrote;
+extern crate fontsan;
 
 use std::io::prelude::*;
 use std::fs::File;
@@ -6,41 +7,31 @@ use std::fs::File;
 #[derive(Debug)]
 enum FontCheckResult {
     IOError,
-    Failure,
-    Success
+    FailureDirectWrite,
+    FailureFontSanitizer,
+    Success,
 }
 
-fn check_font(path : &str) -> FontCheckResult
-{
+fn check_font(path: &str) -> FontCheckResult {
     let mut file = File::open(path);
-    match file.as_mut() 
-    {
-        Err(_) =>
-            { 
-                FontCheckResult::IOError
-            },
-        Ok(ref mut f) => 
-        {
-            let mut buffer : Vec<u8> = vec![];
+    match file.as_mut() {
+        Err(_) => FontCheckResult::IOError,
+        Ok(ref mut f) => {
+            let mut buffer: Vec<u8> = vec![];
             let result = f.read_to_end(&mut buffer);
-            match result 
-            {
-                Err(_) => 
-                {
-                    FontCheckResult::IOError
-                },
-                Ok(_) => 
-                {
-                    let new_font = dwrote::FontFile::new_from_data(&buffer);
-                    match new_font {
-                        Some (_) => 
-                            {
-                                FontCheckResult::Success
-                            },
-                        None => 
-                            {
-                                FontCheckResult::Failure
+            match result {
+                Err(_) => FontCheckResult::IOError,
+                Ok(_) => {
+                    let bytes = fontsan::process(&buffer);
+                    match bytes {
+                        Err(_) => FontCheckResult::FailureFontSanitizer,
+                        Ok(sanitized_buffer) => {
+                            let new_font = dwrote::FontFile::new_from_data(&sanitized_buffer);
+                            match new_font {
+                                Some(_) => FontCheckResult::Success,
+                                None => FontCheckResult::FailureDirectWrite,
                             }
+                        }
                     }
                 }
             }
@@ -48,17 +39,17 @@ fn check_font(path : &str) -> FontCheckResult
     }
 }
 
-fn main() 
-{
-    {
-        let success_font_path = "data/fontawesome-webfont-fixed.woff";
-        let result = check_font(success_font_path);
-        println!("{} : {:?}", success_font_path, result);
-    }
+fn open_file_and_print_result(path: &str) -> () {
+    let result = check_font(path);
+    println!("{} : {:?}", path, result);
+}
 
-    {
-        let failure_font_path = "data/fontawesome-webfont-orig.woff";
-        let result = check_font(failure_font_path);
-        println!("{} : {:?}", failure_font_path, result);
+fn main() {
+    let file_paths = vec!["data/fontawesome-webfont-fixed.woff",
+                          "data/fontawesome-webfont-orig.woff",
+                          "data/garbage.woff"];
+
+    for path in &file_paths {
+        open_file_and_print_result(path);
     }
 }
