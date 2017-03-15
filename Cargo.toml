@@ -4,3 +4,4 @@ version = "0.1.0"
 authors = ["cviot <cviot@optis-world.com>"]
 
 [dependencies]
+dwrote = "0.3.0"
